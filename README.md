@@ -7,4 +7,4 @@ visualization. These include Excel, SQL, Tableau, and R. With R you can both han
 material the course has taught me. The exception to this being Excel as Google Sheets could not handle the size of the data that was being used. Instead, I used 
 [Microsoft SQL Server Management Studio 18](https://www.microsoft.com/en-us/sql-server/sql-server-downloads) for the data preparation and R for the rest of the analysis
 and visualizations. Tableau was used as well for not only visual purposes, but to compare the tables created through R. The tables I created here can also be seen using 
-the [Tableau platform](https://public.tableau.com/app/profile/jared.morrison/viz/CaseStudyCyclistBike-Share/BikeData#1) or through [Medium](). 
+the [Tableau platform](https://public.tableau.com/app/profile/jared.morrison/viz/CaseStudyCyclistBike-Share/BikeData#1) or through [Medium](https://medium.com/@morrisonjar/how-does-a-bike-share-navigate-speedy-success-6259278da900). 
