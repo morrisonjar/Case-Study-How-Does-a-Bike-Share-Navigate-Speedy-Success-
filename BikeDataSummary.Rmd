@@ -1,0 +1,295 @@
+---
+title: 'Case Study: How Does a Bike-Share Navigate Speedy Success'
+author: "Jared Morrison"
+date: "5/15/2022"
+output:
+  html_document: default
+---
+
+Hello! This is officially my first R Markdown report. This case study in particular comes from the [Google Data Analytics Professional Certificate](https://www.coursera.org/professional-certificates/google-data-analytics) course on Coursera. The final portion of this course was a capstone project containing a choice between three case studies. The case study is to show the skills that students have learned throughout the course and apply them by creating a data analysis study. The course itself covered multiple programs to handle data and data visualization. These include Excel, SQL, Tableau, and R. With R you can both handle the data and visualize it however, to test my knowledge I attempted to use all the material the course has taught me. The exception to this being Excel as Google Sheets could not handle the size of the data that was being used. Instead, I used [Microsoft SQL Server Management Studio 18](https://www.microsoft.com/en-us/sql-server/sql-server-downloads) for the data preparation and R for the rest of the analysis and visualizations. Tableau was used as well for not only visual purposes, but to compare the tables created through R. The tables I created here can also be seen using the [Tableau platform](https://public.tableau.com/app/profile/jared.morrison/viz/CaseStudyCyclistBike-Share/BikeData#1) or through [Medium](). The code that I created will be also found on my [Github]() as well. 
+
+# 1. Introduction
+For this case study, I perform tasks of a junior data analyst for a fiction company called Cyclistic, a bike-share company based in Chicago, Illinois. The bike-share program features 5,824 bicycles that are geotracked and locked into a network of 692 stations across Chicago. Bikes can be unlocked from one station and be returned to any other station that is in the system at anytime.
+
+Cyclistic's marketing strategy relied on a flexibility of its pricing plans: single-ride passes, full-day passes, and annual memberships. Customers who bought the single-ride or full-day passes are considered as casual riders, otherwise those who hold annual memberships are considered Cyclistic members. Cyclistic believes that maximizing the number of annual membership is key to future growth and that there is a better chance to be profitable for casual riders to become members than to find a new audience. 
+
+The goal here for the analyst portion is to understand how annual members and casual rider differ, why casual riders would buy a membership, and how digital media could influence casual riders to become members. If trends can be identified it can help create a marketing strategy that can accomplish the goals for Cyclistic.
+
+# 2. Data Source
+The [dataset](https://divvy-tripdata.s3.amazonaws.com/index.html) used in this case study have a different name as Cyclistic is a fictional company. Though for the purpose for this case study, allows me to answer the business questions. The data has been made available by Motivate International Inc. under this [data license agreement](https://ride.divvybikes.com/data-license-agreement). The analysis for this case study is using the data from April 2021 through March 2022. All data is stored by each month contains the following information: 
+
+  * ride_id - Unique ID for each user
+  * rideable_type - Type of bike
+  * started_at - Datetime of when bike is rented
+  * ended_at - Datetime of when bike is returned
+  * start_station_name - Name of the starting station where bike is rented
+  * start_station_id - ID of the starting station
+  * end_station_name - Name of the station where bike is returned
+  * end_station_ id - ID of the end station
+  * start_lat - Latitude of the start station
+  * start_lng - Longitude of the start station
+  * end_lat - Latitude of the end station
+  * end_lng - Longitude of the end station
+  * member_casual - User type
+
+### 2.1 Data Preperation
+To start, I imported all the data from April 2021 through March 2022 into a newly created database within Microsoft SQL Server. When importing I checked to see if the columns had the correct data type needed. Specifically the "started_at" and "ended_at" columns. Those two specifically are important for a lot of calculations made in this case study so both of those columns need to be in a datetime format.
+
+After importing all the data tables, I needed to combine the data into one table. Before I combined the tables, I took the columns I believed where the most valuable in answering the questions posed in this case study. This being:
+  
+  * member_casual
+  * rideable_type
+  * started_at
+  * ended_at
+  * start_station_name
+  * end_station_name
+
+I also created new columns in the data to obtain specific information. The most important columns created are:
+
+  * ride_length - The difference in time from "started_at" and "ended_at" found in minutes
+  * day_of_the_week - Gives us the days of the week I.E. Monday, Tuesday, ...
+  * start_hour - The hour in the day the bike is rented
+  
+Lastly, any data where "start_station_name" and "end_station_name" is NULL, is removed from the dataset.
+
+
+# 3. Analysis in R
+
+The following libraries are downloaded as well as the data created within SQL.
+```{r setup, include=TRUE, results = 'hide', message=FALSE, warning=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)  
+library(dplyr)
+library(scales)
+bike_data <- read_csv("BikeData.csv")
+```
+
+A quick summary of the data. To note: you are able to see that there are still data that contains a zero value. However, the zero seen in "start_hour" and "end_hour" will not be removed. This is because the zero hour is short form for 12 A.M. or midnight.
+```{r warning=FALSE, echo=TRUE, include=TRUE}
+  summary(bike_data)
+```
+
+### 3.1 Data Manipultation
+Here I want to make sure the data type of "ride_length" to numeric so calculations can properly be made.
+```{r eval=FALSE, include=TRUE, results = 'hide'}
+is.factor(bike_data$ride_length)
+bike_data$ride_length_sec <- as.numeric(as.character(bike_data$ride_length))
+is.numeric(bike_data$ride_length)
+```
+
+Here I want to clean the data. Specifically, I will have to get rid any null values in "start_station_name" as well as get rid of anything less
+than zero in "ride_length".
+```{r eval=FALSE, include=TRUE, results = 'hide'}
+bike_data <- bike_data[!(bike_data$start_station_name == "HQ QR" | bike_data$ride_length<0),]
+```
+
+Here R does not know the order of the weekday by default so I create a new column for that as well as ordering them accordingly.
+I also create a column named date for table later on that orders the data from **April 2021 to March 2022.**
+```{r eval=FALSE, include=TRUE}
+bike_data$day_of_week <- ordered(bike_data$day_of_week, levels=c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+```
+
+
+# 4. Results from Analysis
+
+### 4.1 Project Scope
+The data used here contains trends based on historical data from **April 2021 through March 2022**
+
+#### 4.1.1 Percentage of user type
+The first piece of data to be analyzed is the difference between casual users and members of Cyclistic. Since one of there strategies is aimed in converting casual riders into members, it would be important to know the difference between the two. As seen below, **44% of users are casual riders while the remaining 56% are members**. From this data there are 2,044,312 casual riders that can possibly become members of Cyclistic.	
+```{r bike_data, echo = TRUE, include=TRUE}
+#Finding the % of user type
+bike_data %>%
+  group_by(member_casual) %>%
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = n / sum(n)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) #https://thomasadventure.blog/posts/ggplot2-percentage-scale/
+
+
+#Create a visualization for % of user type
+bike_data %>%
+  group_by(member_casual) %>%
+  count() %>% 
+  ungroup() %>% 
+  mutate(perc = n / sum(n)) %>% 
+  arrange(perc) %>%
+  mutate(labels = scales::percent(perc)) %>% 
+  ggplot(aes(x="", y = labels, fill=member_casual))+
+  geom_bar(stat = "identity", width = 1, color = "black") +
+  geom_label(aes(label = labels),
+             position = position_stack(vjust = 0.5),
+             show.legend = FALSE) +
+  labs(fill= "User Type", x = NULL, y = NULL, title = "% of User Types")+
+  coord_polar(theta = "y") +
+  theme_void()
+
+```
+
+#### 4.1.2 Number of trips over the course of a year by each day of the week
+Simply put, by looking at the table below casual riders having the highest number of trips made on the weekends. That being said there is a consistent rate at which trips are made from members each day of the week. Members make up more than half of the trips recorded in the data. Which by itself makes sense due to having more members than casual riders.
+```{r, echo = TRUE, include=TRUE}
+#Finding the number of trips by the day of the week
+bike_data %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>%
+  group_by(member_casual, weekday) %>%
+  summarise(number_of_rides = n(), .groups = 'drop') %>% 
+  arrange(member_casual, weekday)
+
+# Visualize the number of rides by bike type
+bike_data %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>%
+  group_by(member_casual, weekday) %>%
+  summarise(number_of_rides = n(), .groups = 'drop') %>% 
+  arrange(member_casual, weekday) %>% 
+  ggplot(aes(x = weekday, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge") + 
+  scale_y_continuous(labels = comma) +
+  labs(fill= "User Type", x = "Day of the week", y = "Number of trips", title = "Number of trips during the days of the week")
+
+```
+
+#### 4.1.3 Total duration for each user type
+Now that we know that members rent bikes more often, the actual duration they use the bike is nearly cut in half compared to casual riders.
+```{r, echo = TRUE, include=TRUE}
+#Finding the total duration (minutes) by user type
+bike_data %>% 
+  group_by(member_casual) %>% 
+  summarise(number_of_rides = n()
+            ,total_duration = sum(ride_length))
+
+#Create a visualization for total duration by User type
+bike_data %>% 
+  group_by(member_casual) %>% 
+  summarise(number_of_rides = n()
+            ,total_duration = sum(ride_length)) %>% 
+  ggplot(aes(x = member_casual, y = total_duration, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = comma) +
+  labs(fill= "User Type", x = NULL, y = "Duration (minutes)", title = "Total Duration by User Type")+
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank()) # https://stackoverflow.com/questions/35090883/remove-all-of-x-axis-labels-in-ggplot
+```
+
+#### 4.1.4 Average duration for each day of the week
+The likely reason behind why casual riders use the bikes for a longer duration than members stems from the pay models. As casual riders have access to single-ride or full-day passes, they will more likely use the bike as much as they can from the pass they pay for. Members on the other hand can come and go as they please. They would likely use the bike more for getting to one place to another. 
+```{r, echo = TRUE, include=TRUE}
+#Finding the average duration (minutes) for user type by each day of the week
+bike_data %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length), .groups = 'drop')
+
+#Create a visualization for average duration by each day
+bike_data %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length), .groups = 'drop') %>% 
+  arrange(member_casual, weekday) %>% 
+  ggplot(aes(x = weekday, y = average_duration, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(fill = "User Type", x = "Day of the week", y = "Avg. Trip Length (minutes)", title = "Average duration during the days of the week")
+```
+
+#### 4.1.5 Number of trips during the course of the year
+In the chart below you can see that both casual riders and members contain similarities where more trips made in the warmer months, peaking in August. Less trips are made during winter months, plummeting in January.
+```{r echo=TRUE, include=TRUE}
+#Finding the amount of rides for each month during the course of a year
+bike_data %>% 
+  mutate(date = format(as.Date(started_at), "%Y-%m"), label = TRUE) %>% 
+  group_by(member_casual, date) %>% 
+  summarise(number_of_rides = n(), .groups = 'drop') %>% 
+  arrange(member_casual, date) %>% 
+  print(n=30)
+
+#Create a visualization for usage during the day trips/time of day
+bike_data %>% 
+  mutate(date = format(as.Date(started_at), "%Y-%m"), label = TRUE) %>% 
+  group_by(member_casual, date) %>% 
+  summarise(number_of_rides = n(), .groups = 'drop') %>% 
+  arrange(member_casual, date) %>% 
+  ggplot(aes(x = date, y = number_of_rides, group = member_casual)) +
+  geom_line(aes(color = member_casual)) +
+  scale_x_discrete(guide = guide_axis(n.dodge = 2)) + # https://datavizpyr.com/how-to-dodge-overlapping-text-on-x-axis-labels-in-ggplot2/
+  scale_y_continuous(labels = comma) +
+  labs(color = "User Type", x = "Months in the Year", y = "Number of trips", title = "Number of trips in the course of a year")
+```
+
+#### 4.1.6 Top stations for casual riders and members
+Lastly, the following charts show the most popular starting stations between casual riders and members. *Streeter Dr & Grand Ave* is significantly more popular among casual riders than they are among members doubling any other station. Upon further investigation, that station in particular is near **multiple attractions** in the area as well as the other stations after it. The stations that members use are near residential areas.
+```{r, echo = TRUE, include=TRUE}
+bike_data %>% 
+  group_by(start_station_name, member_casual) %>% 
+  summarise(number_of_trips = n(), .groups = 'drop') %>%
+  arrange(desc(number_of_trips)) %>%
+  filter(member_casual == "casual") %>%
+  ungroup() %>% 
+  top_n(10, number_of_trips)
+
+#Create a visualization for top station by casuals
+bike_data %>% 
+  group_by(start_station_name, member_casual) %>% 
+  summarise(number_of_trips = n(), .groups = 'drop') %>%
+  arrange(desc(number_of_trips)) %>%
+  filter(member_casual == "casual") %>%
+  ungroup() %>% 
+  top_n(10, number_of_trips) %>% 
+  ggplot(aes(x = reorder(start_station_name, -number_of_trips), y = number_of_trips)) +
+  geom_col(fill = "#F8766D") + 
+  labs(x = "Station Name", y = "Number of trips", title = "Top Station by casual users") +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 12))  + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+  
+```
+
+```{r, echo = TRUE, include=TRUE}
+#Finding the top 10 stations visited for members
+bike_data %>% 
+  group_by(start_station_name, member_casual) %>% 
+  summarise(number_of_trips = n(), .groups = 'drop') %>%
+  arrange(desc(number_of_trips)) %>%
+  filter(member_casual == "member") %>%
+  ungroup() %>% 
+  top_n(10, number_of_trips)
+
+#Create a visualization for top station by members
+bike_data %>% 
+  group_by(start_station_name, member_casual) %>% 
+  summarise(number_of_trips = n(), .groups = 'drop') %>%
+  arrange(desc(number_of_trips)) %>%
+  filter(member_casual == "member") %>%
+  ungroup() %>% 
+  top_n(10, number_of_trips) %>% 
+  ggplot(aes(x = reorder(start_station_name, -number_of_trips), y = number_of_trips)) +
+  geom_col(fill = "#00BFC4") +
+  labs(x = "Station Name", y = "Number of trips", title = "Top Station by members") +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 12))  +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+  
+```
+
+
+# Conclusion
+Based from this analysis, we have some data that shows how casual riders and members use Cyclistic's bikes. The three key findings and what I would recommend based on those finding are as follows:
+
+1. **Casual riders spend more time on Cyclistic bikes than those who are members by nearly double.**
+      * Show the data shown from the *Average duration for each day of the week* chart as well as the *Total duration for each user type*          chart to your casual riders. You can use this data to show them that they could save more money with a membership than paying a fee            each time they use your service.
+      
+      * You can also give casual riders incentive to become members by reducing the price to start a membership after riding for an allotted           amount of time.
+  
+  
+2. **Weekends see the most growth from casual riders using Cyclistic bikes compared to weekdays.**
+      * For the weekends you can create a weekend-only pass for casual riders at a base rate and offer a membership plan around that base rate.         Doing so could get more members if the the price difference for the membership itself is worth buying.  
+      
+      * Members are shown to be at a consistent rate through out the week, so you could implement member perks. Such as reducing the price of          the cost of a membership if you rent a bike for an "x" amount of time during the week. This could also give incentive casual                   riders to not only want a membership at a lower rate but also see more see more activity of the bikes being used within the weekday.  
+
+
+3. **Cyclistic's bikes are more commonly used within area's that feature attractions of some sort.**
+      * Since the stations that see the most activity are near city attractions, you could produce more advertisements in the area. Even               partnering with the businesses around the area could increase the amount of casual riders.
+      
+      * Offering promotions such as a discount on your first month on a membership at these venues. Would not only boost the amount of                 memberships that could be gained but the venues themselves could see more activity in there area as well.
